@@ -1,0 +1,152 @@
+From 3b253d63bf9077b5d7df9d97112d72f3ad30bfa7 Mon Sep 17 00:00:00 2001
+From: tai271828 <taihsiangho@gmail.com>
+Date: Fri, 28 Feb 2014 16:21:04 +0800
+Subject: [PATCH] ntu adroid 2014 hw 01 of tai271828
+
+Write sysinfo.txt into sdcard right after
+the adroid system boots. It automatically
+lunches the NTU Android Homework app right
+after the adroid system boots.
+---
+ packages/apps/DeviceStatus/AndroidManifest.xml     |  8 ++++-
+ .../tw/edu/ntu/csie/devicestatus/BootReceiver.java | 32 ++++++++++++++++++
+ .../csie/devicestatus/DeviceStatusActivity.java    | 38 ++++++++++++++++++++--
+ 3 files changed, 75 insertions(+), 3 deletions(-)
+ create mode 100644 packages/apps/DeviceStatus/src/tw/edu/ntu/csie/devicestatus/BootReceiver.java
+
+diff --git a/packages/apps/DeviceStatus/AndroidManifest.xml b/packages/apps/DeviceStatus/AndroidManifest.xml
+index 67c9665..c4b32b5 100644
+--- a/packages/apps/DeviceStatus/AndroidManifest.xml
++++ b/packages/apps/DeviceStatus/AndroidManifest.xml
+@@ -5,10 +5,10 @@
+ 
+     <uses-sdk android:minSdkVersion="14" android:targetSdkVersion="17" />
+     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
++    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+ 
+     <application android:icon="@drawable/ic_launcher"
+         android:label="@string/app_title" android:allowBackup="true">
+-
+         <activity android:name="tw.edu.ntu.csie.devicestatus.DeviceStatusActivity"
+             android:label="@string/app_title">
+             <intent-filter>
+@@ -16,5 +16,11 @@
+                 <category android:name="android.intent.category.LAUNCHER" />
+             </intent-filter>
+         </activity>
++        <receiver android:name="tw.edu.ntu.csie.devicestatus.BootReceiver"
++            android:permission="android.permission.RECEIVE_BOOT_COMPLETED">
++                <intent-filter>
++                    <action android:name="android.intent.action.BOOT_COMPLETED" />
++                </intent-filter>
++        </receiver>
+     </application>
+ </manifest>
+diff --git a/packages/apps/DeviceStatus/src/tw/edu/ntu/csie/devicestatus/BootReceiver.java b/packages/apps/DeviceStatus/src/tw/edu/ntu/csie/devicestatus/BootReceiver.java
+new file mode 100644
+index 0000000..e093603
+--- /dev/null
++++ b/packages/apps/DeviceStatus/src/tw/edu/ntu/csie/devicestatus/BootReceiver.java
+@@ -0,0 +1,32 @@
++package tw.edu.ntu.csie.devicestatus;
++
++import android.content.BroadcastReceiver;
++import android.content.Context;
++import android.content.Intent;
++import android.content.IntentFilter;
++import android.hardware.Sensor;
++import android.hardware.SensorManager;
++import android.net.ConnectivityManager;
++import android.net.NetworkInfo;
++import android.os.BatteryManager;
++import android.os.Bundle;
++import android.os.Environment;
++import android.util.Log;
++import android.view.Menu;
++import android.view.MenuItem;
++import android.view.MenuItem.OnMenuItemClickListener;
++import android.view.View;
++import android.widget.TextView;
++import android.widget.Toast;
++
++public class BootReceiver extends BroadcastReceiver {
++    @Override
++    public void onReceive(Context context, Intent intent) {
++        String action = intent.getAction();
++            if(action.equals(Intent.ACTION_BOOT_COMPLETED)) {
++                Intent startActivityIntent = new Intent(context, tw.edu.ntu.csie.devicestatus.DeviceStatusActivity.class);
++                startActivityIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
++                context.startActivity(startActivityIntent);
++            }
++    }
++}
+diff --git a/packages/apps/DeviceStatus/src/tw/edu/ntu/csie/devicestatus/DeviceStatusActivity.java b/packages/apps/DeviceStatus/src/tw/edu/ntu/csie/devicestatus/DeviceStatusActivity.java
+index 9ab114e..3491efe 100644
+--- a/packages/apps/DeviceStatus/src/tw/edu/ntu/csie/devicestatus/DeviceStatusActivity.java
++++ b/packages/apps/DeviceStatus/src/tw/edu/ntu/csie/devicestatus/DeviceStatusActivity.java
+@@ -20,12 +20,32 @@ import android.view.View;
+ import android.widget.TextView;
+ import android.widget.Toast;
+ 
++import java.io.PrintWriter;
++import java.io.File;
++import java.io.IOException;
++
+ public class DeviceStatusActivity extends Activity {
+     private final static String TAG = "NTU-Android";
+ 
+     private TextView batteryView;
+     private ReceiveMessages receiver;
+ 
++    private File myfile;
++          
++    public File createSysinfoFile() {
++    File file = new File( Environment.getExternalStorageDirectory(), "sysinfo.txt" );
++    try {
++        if ( file.createNewFile() == false ) {
++            Log.e( TAG, "sysinfo.txt file is not created" );
++        } else {
++            Log.e( TAG, "sysinfo.txt file is created" );
++        }
++    } catch (IOException e) {
++        e.printStackTrace();
++    }
++        return file;
++    } 
++
+     class ReceiveMessages extends BroadcastReceiver {
+         @Override
+         public void onReceive(Context context, Intent intent) {
+@@ -74,8 +94,21 @@ public class DeviceStatusActivity extends Activity {
+             Log.i(TAG, "ExternalStoragePublicDirectory PODCASTS " + Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PODCASTS));
+             Log.i(TAG, "ExternalStoragePublicDirectory RINGTONES " + Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_RINGTONES));
+             Log.i(TAG, "Environment.getRootDirectory " + Environment.getRootDirectory());
+-        }
+-        catch (Throwable thr) {
++            myfile = createSysinfoFile();
++            myfile.setWritable( true );
++            myfile.setReadable( true );
++            try {
++                PrintWriter printWriter = new PrintWriter( myfile );
++                printWriter.println( "Build ID: " + android.os.Build.ID );
++                printWriter.println( "Display ID: " + android.os.Build.DISPLAY );
++                printWriter.println( "Build date: " + android.os.Build.TIME );
++                printWriter.println( "Build type: " + android.os.Build.TYPE );
++                printWriter.println( "Fingerprint: " + android.os.Build.FINGERPRINT );
++                printWriter.close();
++            } catch(Exception ex) {
++                Log.i( TAG, "Error on printWriter" );
++            }
++        } catch (Throwable thr) {
+             Log.e(TAG, "Ouch!", thr);
+         }
+     }
+@@ -146,4 +179,5 @@ public class DeviceStatusActivity extends Activity {
+         Toast.makeText(DeviceStatusActivity.this, msg,
+                 Toast.LENGTH_SHORT).show();
+     }
++
+ }
+-- 
+1.8.3.2
+
